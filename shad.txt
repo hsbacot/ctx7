@@ -1,0 +1,45 @@
+[?25l[?2004h⣽  Searching context7.com for 'shadcn'...
+[A⣻  Searching context7.com for 'shadcn'...
+[A⢿  Searching context7.com for 'shadcn'...
+[A⡿  Searching context7.com for 'shadcn'...
+[A⣟  Searching context7.com for 'shadcn'...
+[A⣯  Searching context7.com for 'shadcn'...
+[A⣷  Searching context7.com for 'shadcn'...
+[A⣾  Searching context7.com for 'shadcn'...
+[A⣽  Searching context7.com for 'shadcn'...
+[A
+    🔍 Library Search (5 results)                                      
+                                                                       
+│ Shadcn UI  ⭐ 86.1K  🏆 10.0 ✨                                      
+│ @shadcn-ui • 1 weeks ago • 🔢 138K tokens                            
+│ shadcn/ui provides accessible and customizable UI components that can
+│ be copied and pasted into your applications, allowing you to build...
+│ [5 versions] • main branch                                           
+                                                                       
+  Shadcn Vue  ⭐ 7.0K  🏆 7.2 ✨                                       
+  @unovue • 2 weeks ago • 🔢 113K tokens                               
+  shadcn-vue is an unofficial community-led Vue port of shadcn/ui,     
+  offering accessible and customizable components to build your own... 
+  [1 versions] • dev branch                                            
+                                                                       
+  shadcn/ui  ⭐ -1  🏆 8.8 ✨                                          
+  @websites • yesterday • 🔢 257K tokens                               
+  shadcn/ui is a collection of beautifully designed, accessible UI     
+  components and a code distribution platform that works with your...  
+                                                                       
+  Shadcn UI  ⭐ -1  🏆 8.0                                             
+  @llmstxt • 2 months ago • 🔢 179K tokens                             
+  Shadcn UI is an open-source collection of beautifully-designed,      
+  accessible UI components built with TypeScript, Tailwind CSS, and... 
+                                                                       
+                                                                       
+                                                                       
+                                                                       
+                                                                       
+                                                                       
+                                                                       
+                                                                       
+  ••                                                                   
+                                                                       
+  ↑/k up • ↓/j down • q quit • ? more                                  
+Sort: Stars ▼[2K[?2004l[?25h[?1002l[?1003l[?1006l

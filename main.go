@@ -4,96 +4,142 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/hsbacot/ctx7/client"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hsbacot/ctx7/cache"
+	"github.com/hsbacot/ctx7/cmd"
+	"github.com/hsbacot/ctx7/tui"
 	"github.com/hsbacot/ctx7/ui"
 )
 
 func main() {
+	// Check for cache subcommand before parsing flags
+	if len(os.Args) > 1 && os.Args[1] == "cache" {
+		cacheManager, err := initCache()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing cache: %v\n", err)
+			os.Exit(1)
+		}
+		cmd.RunCacheCommand(os.Args[2:], cacheManager)
+		return
+	}
+
 	// Parse command-line flags
 	interactive := flag.Bool("i", false, "interactive mode - show selection menu for multiple matches")
 	flag.BoolVar(interactive, "interactive", false, "interactive mode - show selection menu for multiple matches")
+
 	verbose := flag.Bool("v", false, "verbose mode - show detailed logs")
 	flag.BoolVar(verbose, "verbose", false, "verbose mode - show detailed logs")
+
+	noCache := flag.Bool("no-cache", false, "skip cache, force fresh fetch")
+	clearCache := flag.Bool("clear-cache", false, "clear all cached content")
+
+	showVersions := flag.Bool("versions", false, "show and select version")
+	flag.BoolVar(showVersions, "select-version", false, "show and select version")
+
 	flag.Parse()
 
-	// Initialize logger
-	logger := ui.InitLogger(*verbose)
+	// Handle clear-cache command
+	if *clearCache {
+		c, err := initCache()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing cache: %v\n", err)
+			os.Exit(1)
+		}
+		if err := c.Clear(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error clearing cache: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Cache cleared successfully")
+		return
+	}
 
-	// Get query from arguments
+	// Require query argument
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: ctx7 [OPTIONS] <library-name>")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Options:")
-		fmt.Fprintln(os.Stderr, "  -i, --interactive    Show selection menu for multiple matches")
-		fmt.Fprintln(os.Stderr, "  -v, --verbose        Show detailed logs")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Example:")
-		fmt.Fprintln(os.Stderr, "  ctx7 react-router")
-		fmt.Fprintln(os.Stderr, "  ctx7 -i react")
+		printUsage()
 		os.Exit(1)
 	}
 
 	query := args[0]
-	logger.Debug("Starting search", "query", query, "interactive", *interactive)
 
-	// Create API client
-	apiClient := client.NewClient()
+	// Initialize cache
+	cacheManager, err := initCache()
+	if err != nil && *verbose {
+		fmt.Fprintf(os.Stderr, "Warning: Cache unavailable: %v\n", err)
+	}
 
-	// Search for libraries
-	logger.Info("Searching context7.com", "query", query)
-	results, err := apiClient.SearchLibraries(query)
+	// Initialize logger
+	logger := ui.InitLogger(*verbose)
+
+	// Create and run Bubble Tea model
+	opts := tui.Options{
+		Interactive:  *interactive,
+		Verbose:      *verbose,
+		NoCache:      *noCache,
+		ShowVersions: *showVersions,
+		Logger:       logger,
+		Cache:        cacheManager,
+	}
+
+	m := tui.NewModel(query, opts)
+
+	// Create program with appropriate options
+	var p *tea.Program
+	p = tea.NewProgram(m, tea.WithInput(os.Stdin))
+
+	finalModel, err := p.Run()
 	if err != nil {
-		logger.Error("Search failed", "error", err)
+		logger.Error("Application error", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Debug("Search completed", "results", len(results))
+	// Extract final state
+	final := finalModel.(tui.Model)
 
-	// Handle no results
-	if len(results) == 0 {
-		logger.Warn("No libraries found", "query", query)
+	if final.Err() != nil {
+		logger.Error("Fetch failed", "error", final.Err())
 		os.Exit(1)
 	}
 
-	// Select library
-	var selectedLib *client.Library
-	if len(results) == 1 {
-		// Only one result - use it automatically
-		selectedLib = &results[0]
-		logger.Info("Found library", "title", selectedLib.Title, "id", selectedLib.ID)
-	} else {
-		// Multiple results
-		if *interactive {
-			// Interactive mode - show selection menu
-			logger.Info("Found multiple libraries", "count", len(results))
-			selected, err := ui.SelectLibrary(results)
-			if err != nil {
-				logger.Error("Selection failed", "error", err)
-				os.Exit(1)
-			}
-			selectedLib = selected
-			logger.Info("Selected library", "title", selectedLib.Title, "id", selectedLib.ID)
-		} else {
-			// Non-interactive mode - use first result
-			selectedLib = &results[0]
-			logger.Info("Found multiple libraries, using first match", "title", selectedLib.Title, "id", selectedLib.ID)
-			logger.Info("Use -i flag to select interactively")
-		}
-	}
+	// Output content to stdout
+	fmt.Print(final.Content())
+}
 
-	// Fetch llms.txt content
-	logger.Info("Fetching llms.txt", "library", selectedLib.Title)
-	content, err := apiClient.FetchLLMsTxt(selectedLib.ID)
+func initCache() (*cache.Cache, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		logger.Error("Fetch failed", "library", selectedLib.ID, "error", err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	logger.Debug("Fetch completed", "bytes", len(content))
-	logger.Info("Success!", "library", selectedLib.Title)
+	cacheDir := filepath.Join(homeDir, ".cache", "ctx7")
+	return cache.NewCache(cacheDir)
+}
 
-	// Output raw content to stdout
-	fmt.Print(content)
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: ctx7 [OPTIONS] <library-name>")
+	fmt.Fprintln(os.Stderr, "       ctx7 cache <command> [OPTIONS]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Options:")
+	fmt.Fprintln(os.Stderr, "  -i, --interactive       Show selection menu for multiple matches")
+	fmt.Fprintln(os.Stderr, "  -v, --verbose           Show detailed logs")
+	fmt.Fprintln(os.Stderr, "  --versions              Show version selection menu")
+	fmt.Fprintln(os.Stderr, "  --no-cache              Skip cache, force fresh fetch")
+	fmt.Fprintln(os.Stderr, "  --clear-cache           Clear all cached content")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Cache Commands:")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache stats        Show cache statistics")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache list         List all cached libraries")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache clear        Clear entire cache")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache remove <lib> Remove specific library")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache update <lib> Force refresh specific library")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache prune        Remove old cache entries")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Examples:")
+	fmt.Fprintln(os.Stderr, "  ctx7 react-router")
+	fmt.Fprintln(os.Stderr, "  ctx7 -i react")
+	fmt.Fprintln(os.Stderr, "  ctx7 --versions react-router")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache stats")
+	fmt.Fprintln(os.Stderr, "  ctx7 cache prune --days 30")
 }
