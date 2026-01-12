@@ -86,8 +86,9 @@ func main() {
 	m := tui.NewModel(query, opts)
 
 	// Create program with appropriate options
+	// Output TUI to stderr so stdout only contains the final content (for piping)
 	var p *tea.Program
-	p = tea.NewProgram(m, tea.WithInput(os.Stdin))
+	p = tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stderr))
 
 	finalModel, err := p.Run()
 	if err != nil {
